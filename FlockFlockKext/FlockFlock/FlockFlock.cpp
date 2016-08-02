@@ -470,7 +470,7 @@ int com_zdziarski_driver_FlockFlock::ff_kauth_callback(kauth_cred_t credential, 
     pid = proc_selfpid();
     ppid = proc_selfppid();
 
-    IOLog("ff_kauth_callback: pid %d(%d, %d) parent %d path %s\n", pid, uid, gid, ppid, proc_path);
+    IOLog("ff_kauth_callback: pid %d(%d, %d) path %s\n", pid, uid, gid, proc_path);
     
     /* shorten applications down to their .app package */
     if (!strncmp(proc_path, "/Applications/", 14)) {
@@ -634,6 +634,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     int pid = proc_selfpid();
     struct pid_path *ptr;
     int agentPID;
+    char *p, *q;
     
     if (vp == NULL)             /* something happened */
         return 0;
@@ -672,6 +673,28 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     
     IOLockUnlock(lock);
     
+    /* process hierarchy */
+    p = proc_path;
+    q = NULL;
+    while(p[0]) {
+        if (p[0] == '/' && p[1])
+            q = p;
+        p++;
+    }
+    if (q && q[0]) {
+        char process_name[PATH_MAX] = { 0 };
+        char app_name[PATH_MAX];
+        proc_selfname(process_name, PATH_MAX);
+        process_name[PATH_MAX-1] = 0;
+        snprintf(app_name, sizeof(app_name), "%s.app/", process_name);
+        if (strcmp(q+1, process_name) && strcmp(q+1, app_name)) {
+            char via[128];
+            IOLog("process %s is via %s(%s)\n", proc_path, process_name, app_name);
+            snprintf(via, sizeof(via), " via %s", process_name);
+            strncat(proc_path, via, sizeof(proc_path)-1);
+        }
+    }
+
     if (proc_path[0]) {
         strncpy(query->process_name, proc_path, PATH_MAX);
         IOLog("ff_vnode_check_open: process path for pid %d is %s\n", pid, proc_path);
