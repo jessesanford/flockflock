@@ -6,9 +6,9 @@ This project is currently UNDER DEVELOPMENT and ALPHA VERSION.
 USE AT YOUR OWN RISK!
 
 NOTE: I have applied for a kext signing certificate from Apple. Without 
-one, FlockFlock only works with SIP turned off on the host machine, 
-therefore FlockFlock should be used only for testing until Apple 
-provides a cert.
+one, FlockFlock only works with SIP's kext checking turned off on the 
+host machine, therefore FlockFlock should be used only for testing until 
+Apple provides a cert.
 
 WHY WE NEED FLOCKFLOCK
 
@@ -86,15 +86,16 @@ FEATURES
 INSTALLATION
 
 NOTE: Until Apple provides me with kext a kext signing certificate, you 
-will have to disable SIP in order to use FlockFlock. This compromises
-the security of macOS, so I only recommend using FlockFlock for testing
-until Apple cuts a kext signing cert for me. 
+will have to disable SIP's kext checks in order to use FlockFlock, but
+can leave the rest of SIP on. This slightly compromises the security of 
+macOS, so I only recommend using FlockFlock for testing until Apple cuts a 
+kext signing cert for me. 
 
 Reboot your computer into "Recovery Mode" by rebooting and holding in
 Command-R after the chime, until it boots to the recovery partition.
 Start a Terminal (Utilities->Terminal) and type:
 
-    csrutil disable; reboot
+    csrutil enable --without-kext; reboot
 
 After your system reboots, double click the FlockFlock.pkg file and follow 
 the installation process. A reboot is recommended after installation, but 
