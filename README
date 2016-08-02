@@ -195,3 +195,10 @@ CHANGELOG
 0.0.3   Added radio buttons for choosing "Once", "Until Restart",
         and "Forever"
 0.0.4   Fixed issues with OSDictionary, replaced with custom structure
+0.0.5	Implemented KAuth to replace vnode_check_exec hooks
+        Added process hierarchy (e.g. "/bin/sh via Xcode")
+        Improvements to locking and memory allocation
+        Significant code cleanup
+        Added keychain files to default ruleset, as many apps use it
+        Other various improvements
+        Hopefully added (some) stability for Sierra
