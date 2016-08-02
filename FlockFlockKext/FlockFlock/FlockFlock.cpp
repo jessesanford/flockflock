@@ -139,13 +139,10 @@ bool com_zdziarski_driver_FlockFlock::init(OSDictionary *dict)
     notificationPort   = MACH_PORT_NULL;
     lastPolicyAdded    = NULL;
     policyRoot         = NULL;
+    pid_root           = NULL;
     filterActive       = false;
     shouldStop         = false;
     userAgentPID       = 0;
- 
-    taskPathTable = new OSDictionary;
-    taskPathTable->initWithCapacity(32767); 
-    
     lock     = IOLockAlloc();
     portLock = IOLockAlloc();
     
@@ -443,43 +440,56 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec_static(OSObject *provid
 int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec(kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel, struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen)
 {
     char proc_path[MAXPATHLEN];
-    int pid = proc_selfpid();
     int proc_len = MAXPATHLEN;
+    int pid = proc_selfpid();
     int ret;
-    
-    printf("ff_vnode_check_exec: looking up process path for pid %d\n", pid);
 
+    printf("ff_vnode_check_exec: looking up process path for pid %d\n", pid);
     ret = vn_getpath(vp, proc_path, &proc_len); /* path to proc binary */
     if (ret != 0) {
-        printf("ff_vnode_check_exec: lookup failed for pid %d, error %d, looking up script path\n", pid, ret);
-        ret = vn_getpath(scriptvp, proc_path, &proc_len); /* path to proc script */
-    }
-    
-    if (ret == 0) {
-        OSString *processPath;
-        proc_path[MAXPATHLEN-1] = 0;
-        proc_len = (int)strlen(proc_path);
-        
-        /* Shorten applications down to their .app package */
-        if (!strncmp(proc_path, "/Applications/", 14)) {
-            char *ptr = proc_path + 14;
-            while(ptr < (proc_path + proc_len)-4 && strncasecmp(ptr, ".app/", 4))
-                { ptr++; }
-            if (ptr < (proc_path + proc_len)-4)
-                ptr[5] = 0;
-        }
-        
-        processPath = OSString::withCString(proc_path);
-        char pidString[16];
-        
-        printf("ff_vnode_check_exec: process path for pid %d is %s\n", pid, proc_path);
-
-        snprintf(pidString, sizeof(pidString), "%d", pid);
-        taskPathTable->setObject(pidString, processPath);
-    } else {
         printf("ff_vnode_check_exec: lookup failed for pid %d, error %d\n", pid, ret);
+        return 0;
     }
     
+    proc_path[MAXPATHLEN-1] = 0;
+    proc_len = (int)strlen(proc_path);
+    IOLog("ff_vnode_check_exec: process path for pid %d is %s len %d\n", pid, proc_path, proc_len);
+
+    /* Shorten applications down to their .app package */
+    if (!strncmp(proc_path, "/Applications/", 14)) {
+        char *dot = strchr(proc_path, '.');
+        if (dot && !strncmp(dot, ".app/", 5)) {
+            dot[5] = 0;
+        }
+    }
+    
+    IOLockLock(lock);
+    if (proc_len > 0) {
+        struct pid_path *p = (struct pid_path *)IOMalloc(sizeof(struct pid_path));
+        if (p) {
+            p->pid = pid;
+            p->next = NULL;
+            strncpy(p->path, proc_path, PATH_MAX-1);
+            if (! pid_root ) {
+                pid_root = p;
+            } else {
+                struct pid_path *ptr = NULL, *next = pid_root;
+                while(next) {
+                    if (next->pid == pid) {
+                        strncpy(next->path, proc_path, PATH_MAX-1);
+                        IOFree(p, sizeof(struct pid_path));
+                        IOLockUnlock(lock);
+                        return 0;
+                    }
+                    ptr = next;
+                    next = next->next;
+                }
+                if (ptr)
+                    ptr->next = p;
+            }
+        }
+    }
+    IOLockUnlock(lock);
     return 0;
 }
 
@@ -489,63 +499,30 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open_static(OSObject *provid
     return me->ff_vnode_check_open(cred, vp, label, acc_mode);
 }
 
-int com_zdziarski_driver_FlockFlock::ff_evaluate_vnode_check_open(kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode, struct policy_query *query)
+int com_zdziarski_driver_FlockFlock::ff_evaluate_vnode_check_open(struct policy_query *query)
 {
     bool blacklisted = false, whitelisted = false;
-    char target[PATH_MAX];
-    char proc_path[PATH_MAX];
-    size_t target_len = 0, proc_len = 0;
-    int buflen = PATH_MAX;
-    int pid = proc_selfpid();
-    char pidString[16];
-    OSString *processPath;
-    
-    if (vp == NULL)         /* something happened */
-        return 0;
-    if (vnode_isdir(vp))    /* always allow directories, we only work with files */
-        return 0;
-    
-    if (! vn_getpath(vp, target, &buflen))  /* path to target (file) */
-        target_len = strlen(target);
-    target[PATH_MAX-1] = 0;
-    
-    if (userAgentPID == pid) {
-        printf("allowing user agent pid access to %s\n", target);
-        return 0;
-    }
-    
-    if (!strncmp(target, "/dev/", 5)) /* allow all /dev access */
-        return 0;
-    
-    snprintf(pidString, sizeof(pidString), "%d", pid);
-    processPath = (OSString *)taskPathTable->getObject(pidString);
-    if (processPath) {
-        strncpy(proc_path, processPath->getCStringNoCopy(), PATH_MAX);
-        proc_len = strlen(proc_path);
-        printf("ff_vnode_check_open: process path for pid %d is %s\n", pid, proc_path);
-    } else {
-        printf("ff_vnode_check_open: failed to locate process path for pid %d\n", pid);
-        return 0;
-    }
+    int proc_len = (int)strlen(query->process_name);
+    int path_len = (int)strlen(query->path);
     
     FlockFlockPolicy rule = policyRoot;
     while(rule) {
-        int match = 1;
         size_t rpath_len = strlen(rule->data.rulePath);
+        bool match = true;
         
         /* temporary rules must match the pid of the current operation */
-        if (rule->data.temporaryRule && rule->data.temporaryPid != pid)
-            match = 0;
+        if (rule->data.temporaryRule && rule->data.temporaryPid != query->pid)
+            match = false;
         
         /* rule out any process-specific rules that don't match */
         if (rule->data.processName[0]) {
-            size_t ppath_len = strlen(rule->data.processName);
-            if (rule->data.processName[ppath_len-1] == '/') { /* directory prefix */
-                if (strncmp(proc_path, rule->data.processName, ppath_len)) {
-                    match = 0;
+            size_t rproc_len = strlen(rule->data.processName);
+            if (rule->data.processName[rproc_len-1] == '/') { /* directory prefix */
+                if (strncmp(query->process_name, rule->data.processName, rproc_len)) {
+                    match = false;
                 }
-            } else if (strcmp(proc_path, rule->data.processName)) { /* full path */
-                match = 0;
+            } else if (strcmp(query->process_name, rule->data.processName)) { /* full path */
+                match = false;
             }
         }
         
@@ -553,28 +530,28 @@ int com_zdziarski_driver_FlockFlock::ff_evaluate_vnode_check_open(kauth_cred_t c
         if (rpath_len) {
             switch(rule->data.ruleType) {
                 case(kFlockFlockPolicyTypePathPrefix):
-                    if (strncasecmp(rule->data.rulePath, target, strlen(rule->data.rulePath)))
-                        match = 0;
+                    if (strncasecmp(rule->data.rulePath, query->path, rpath_len))
+                        match = false;
                     break;
                 case(kFlockFlockPolicyTypeFilePath):
                     if (rule->data.rulePath[rpath_len-1] == '/') { /* directory prefix */
-                        if (strncmp(target, rule->data.rulePath, rpath_len)) {
-                            match = 0;
+                        if (strncmp(query->path, rule->data.rulePath, rpath_len)) {
+                            match = false;
                         }
-                        if (target_len > rpath_len) { /* don't apply to nested folders */
-                            if (strchr(target + rpath_len, '/')) {
-                                match = 0;
+                        if (path_len > rpath_len) { /* don't apply to nested folders */
+                            if (strchr(query->path + rpath_len, '/')) {
+                                match = false;
                             }
                         }
-                    } else if (strcasecmp(rule->data.rulePath, target)) { /* full path */
-                        match = 0;
+                    } else if (strcasecmp(rule->data.rulePath, query->path)) { /* full path */
+                        match = false;
                     }
                     break;
                 case(kFlockFlockPolicyTypePathSuffix):
-                    if (target_len <= rpath_len)
-                        match = 0;
-                    if (strcasecmp(target + (target_len - rpath_len), rule->data.rulePath))
-                        match = 0;
+                    if (path_len <= rpath_len)
+                        match = false;
+                    if (strcasecmp(query->path + (path_len - rpath_len), rule->data.rulePath))
+                        match = false;
                     break;
                 default:
                     break;
@@ -607,53 +584,98 @@ int com_zdziarski_driver_FlockFlock::ff_evaluate_vnode_check_open(kauth_cred_t c
     if (whitelisted == true)
         return 0;
     if (blacklisted == true) {
-        printf("FlockFlock::ff_vnode_check_open: deny open of %s by pid %d (%s) wht %d blk %d\n", target, pid, proc_path, whitelisted, blacklisted);
-
+        printf("FlockFlock::ff_vnode_check_open: deny open of %s by pid %d (%s) wht %d blk %d\n", query->path, query->pid, query->process_name, whitelisted, blacklisted);
+        
         return EACCES;
     }
     
-    printf("FlockFlock::ff_vnode_check_open: ask open of %s by pid %d (%s) wht %d blk %d\n", target, pid, proc_path, whitelisted, blacklisted);
+    printf("FlockFlock::ff_vnode_check_open: ask open of %s by pid %d (%s) wht %d blk %d\n", query->path, query->pid, query->process_name, whitelisted, blacklisted);
 
-    query->pid = pid;
-    query->query_type = FFQ_ACCESS;
-    bcopy(target, query->path, target_len+1);
-    bcopy(proc_path, query->process_name, proc_len+1);
-    
     return EAUTH;
 }
 
 int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode)
 {
-    struct policy_query query;
+    struct policy_query *query;
     struct policy_response response;
-    int ret = ff_evaluate_vnode_check_open(cred, vp, label, acc_mode, &query);
+    char target[PATH_MAX];
+    char proc_path[PATH_MAX];
+    int buflen = PATH_MAX;
+    int pid = proc_selfpid();
+    struct pid_path *ptr;
+    
+    if (vp == NULL)             /* something happened */
+        return 0;
+    if (vnode_isdir(vp))        /* always allow directories, we only work with files */
+        return 0;
+    if (userAgentPID == pid) {  /* friendlies */
+        printf("allowing user agent pid access to %s\n", target);
+        return 0;
+    }
+    
+    /* build the policy query */
 
+    query = (struct policy_query *)IOMalloc(sizeof(struct policy_query));
+    query->pid = pid;
+    query->query_type = FFQ_ACCESS;
+    
+    if (! vn_getpath(vp, query->path, &buflen))
+        query->path[PATH_MAX-1] = 0;
+    
+    /* pull out the query path from our dictionary */
+    
+    IOLockLock(lock);
+    
+    ptr = pid_root;
+    proc_path[0] = 0;
+    
+    while(ptr) {
+        if (ptr->pid == pid) {
+            strncpy(proc_path, ptr->path, PATH_MAX-1);
+            break;
+        }
+        ptr = ptr->next;
+    }
+    
+    IOLockUnlock(lock);
+    
+    if (proc_path[0]) {
+        strncpy(query->process_name, proc_path, PATH_MAX);
+        printf("ff_vnode_check_open: process path for pid %d is %s\n", pid, proc_path);
+    } else {
+        printf("ff_vnode_check_open: failed to locate process path for pid %d\n", pid);
+        IOFree(query, sizeof(struct policy_query));
+        return 0;
+    }
+    
+    int ret = ff_evaluate_vnode_check_open(query);
     if (ret == EAUTH) {
-        
         IOLockLock(policyContext.policy_lock);
         IOLockLock(policyContext.reply_lock);
-        
+
         /* re-evaluate in case the rule was just added */
-        int ret2 = ff_evaluate_vnode_check_open(cred, vp, label, acc_mode, &query);
+        int ret2 = ff_evaluate_vnode_check_open(query);
         if (ret2 != EAUTH) {
             IOLockUnlock(policyContext.policy_lock);
             IOLockUnlock(policyContext.reply_lock);
-            return ret2;
-        }
-        
-        /* sent the query, wait for response */
-        if (sendPolicyQuery(&query, &policyContext, false) == 0) {
-            printf("FlockFlock::ff_node_check_option: sent policy query successfully, waiting for reply\n");
-            bool success = receivePolicyResponse(&response, &policyContext);
-            if (success) {
-                ret = response.response;
-            }
+            ret = ret2;
         } else {
-            printf("FlockFlock::ff_vnode_check_open: user agent is unavailable to prompt user, denying access\n");
-            ret = EACCES;
+            /* sent the query, wait for response */
+
+            if (sendPolicyQuery(query, &policyContext, false) == 0) {
+                printf("FlockFlock::ff_node_check_option: sent policy query successfully, waiting for reply\n");
+                bool success = receivePolicyResponse(&response, &policyContext);
+                if (success) {
+                    ret = response.response;
+                }
+            } else {
+                printf("FlockFlock::ff_vnode_check_open: user agent is unavailable to prompt user, denying access\n");
+                ret = EACCES;
+            }
         }
     }
     
+    IOFree(query, sizeof(struct policy_query));
     return ret;
 }
 
@@ -679,13 +701,19 @@ void com_zdziarski_driver_FlockFlock::stop(IOService *provider)
 
 void com_zdziarski_driver_FlockFlock::free(void)
 {
+    struct pid_path *ptr=NULL, *next;
     IOLog("IOKitTest::free\n");
     clearAllRules();
     IOLockFree(lock);
     IOLockFree(portLock);
     
     destroyQueryContext(&policyContext);
-    taskPathTable->free();
+    ptr = pid_root;
+    while(ptr) {
+        next = ptr->next;
+        IOFree(ptr, sizeof(struct pid_path));
+        ptr = next;
+    }
 
     super::free();
 }

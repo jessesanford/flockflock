@@ -30,6 +30,14 @@ struct mach_query_context
     uint32_t security_token;
 };
 
+/* was going to use OSDictinoary but it's just an array, so... */
+struct pid_path
+{
+    int pid;
+    char path[PATH_MAX];
+    struct pid_path *next;
+};
+
 class com_zdziarski_driver_FlockFlock : public IOService
 {
     OSDeclareDefaultStructors(com_zdziarski_driver_FlockFlock)
@@ -48,7 +56,7 @@ public:
     static int ff_vnode_check_open_static(OSObject *provider, kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode);
     int ff_vnode_check_open(kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode);
     static int ff_get_agent_pid_static(OSObject *provider);
-    int ff_evaluate_vnode_check_open(kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode, struct policy_query *);
+    int ff_evaluate_vnode_check_open(struct policy_query *);
 
     /* IOUserClient methods */
     bool startFilter();
@@ -79,7 +87,7 @@ private:
     IOLock *portLock;
     FlockFlockPolicyHierarchy policyRoot;
     FlockFlockPolicy lastPolicyAdded;
-    OSDictionary *taskPathTable;
+    struct pid_path *pid_root;
     
     /* file access policy */
     mac_policy_handle_t policyHandle;
