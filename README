@@ -28,7 +28,7 @@ In Simple Terms:
 
 FlockFlock is a utility to help protect your personal files in OS X,
 to be able to tell if your system has been compromised, and to defend
-your personal data against randsomware, spyware, infection, and other 
+your personal data against ransomware, spyware, infection, and other 
 threats by preventing unauthorized processes (even by super user processes)
 from being able to open and read your files without your explicit 
 permission.
@@ -75,7 +75,7 @@ NOTE: FlockFlock's locking is much more advanced than the flocks of olde,
 FEATURES
 
 - Real-time, kernel-level protection against unauthorized access to files
-- Defend against randomware, spyware or other malicious programs that
+- Defend against ransomware, spyware or other malicious programs that
   might attempt to steal or encrypt your personal
 - A user-friendly interface to add new rules and receive notifications of
   unauthorized access attempts.
