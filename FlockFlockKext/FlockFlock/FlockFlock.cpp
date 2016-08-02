@@ -672,7 +672,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     }
     
     IOLockUnlock(lock);
-    
+
     /* process hierarchy */
     p = proc_path;
     q = NULL;

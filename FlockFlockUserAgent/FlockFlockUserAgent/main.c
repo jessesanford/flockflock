@@ -243,9 +243,9 @@ int prompt_user_response(struct policy_query *query)
     
     snprintf(alert_message, sizeof(alert_message), "FlockFlock detected an access attempt to the file '%s'\n\nApplication:\n%s (%d)\n\nParent:\n%s (%d)\n",
              query->path, proc_path, query->pid, pproc_path, ppid);
-    alert_str = CFStringCreateWithCStringNoCopy(NULL, alert_message, kCFStringEncodingUTF8, NULL);
     printf("%s\n", alert_message);
-    
+    alert_str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, strdup(alert_message), kCFStringEncodingMacRoman, kCFAllocatorDefault);
+   
     CFStringRef base = CFSTR("file:///Library/Application%20Support/FlockFlock/lock.png");
     CFURLRef icon = CFURLCreateWithString(NULL, base, NULL);
     
@@ -368,6 +368,7 @@ int prompt_user_response(struct policy_query *query)
     CFRelease(parameters);
     CFRelease(popup_options);
     CFRelease(radio_options);
+    CFRelease(alert_str);
     
     /* add new rule to driver */
     if (responseFlags & CFUserNotificationCheckBoxChecked(1) || responseFlags & CFUserNotificationCheckBoxChecked(2))
@@ -468,8 +469,9 @@ int start_driver_comms() {
             fprintf(stderr, "sending configuration\n");
             r = send_configuration(driverConnection);
             snprintf(pid, sizeof(pid), "%d", getpid());
-            str = CFStringCreateWithCStringNoCopy(NULL, pid, kCFStringEncodingUTF8, NULL);
+            str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, strdup(pid), kCFStringEncodingUTF8, kCFAllocatorDefault);
             IORegistryEntrySetCFProperty(service, CFSTR("pid"), str);
+            CFRelease(str);
             
             if (r == 0) {
                 context.version = 0;
@@ -509,7 +511,7 @@ int main(int argc, char *argv[]) {
     static struct termios oldt, newt;
     bool run = true;
     
-    ptrace(PT_DENY_ATTACH, 0, 0, 0);
+    // ptrace(PT_DENY_ATTACH, 0, 0, 0);
     
     tcgetattr( STDIN_FILENO, &oldt);
     newt = oldt;
