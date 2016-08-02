@@ -55,5 +55,6 @@ allow suffix "/.CFUserTextEncoding" "any" no
 
 ; many processes map libs into memory that store things in the keychain
 allow suffix ".keychain-db" "any" no
+allow suffix "/login.keychain" "any" no
 
 ; user-defined rules will be added here

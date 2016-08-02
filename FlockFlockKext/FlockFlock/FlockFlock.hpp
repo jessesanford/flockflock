@@ -30,7 +30,7 @@ struct mach_query_context
     uint32_t security_token;
 };
 
-/* was going to use OSDictinoary but it's just an array, so... */
+/* was going to use OSDictinoary but it's just an array too, so... */
 struct pid_path
 {
     int pid;
@@ -85,17 +85,16 @@ public:
 private:
     bool filterActive, shouldStop;
     IOLock *lock;
-    IOLock *portLock;
     FlockFlockPolicyHierarchy policyRoot;
     FlockFlockPolicy lastPolicyAdded;
     struct pid_path *pid_root;
     
-    /* file access policy */
+    /* file access MAC policy */
     mac_policy_handle_t policyHandle;
     struct mac_policy_ops policyOps;
     struct mac_policy_conf policyConf;
     
-    /* exec policy; we watch processes even when filtering isn't active */
+    /* exec MAC policy; we watch processes even when filtering isn't active */
     mac_policy_handle_t execHandle;
     struct mac_policy_ops execOps;
     struct mac_policy_conf execConf;
