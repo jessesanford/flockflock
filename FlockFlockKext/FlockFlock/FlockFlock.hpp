@@ -15,6 +15,8 @@
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/kern_event.h>
+#include <sys/kauth.h>
+#include <sys/kern_event.h>
 #include <libkern/libkern.h>
 #include <mach/mach_types.h>
 #include <security/mac.h>
@@ -33,7 +35,11 @@ struct mach_query_context
 /* was going to use OSDictinoary but it's just an array too, so... */
 struct pid_path
 {
-    int pid;
+    uid_t uid;
+    gid_t gid;
+    pid_t pid;
+    pid_t ppid;
+    
     char path[PATH_MAX];
     struct pid_path *next;
 };
@@ -52,10 +58,12 @@ public:
     
     /* MAC policy methods and static hooks */
     
-    static int ff_vnode_check_exec_static(OSObject *provider, kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel,struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen);
-    int ff_vnode_check_exec(kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel,struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen);
     static int ff_vnode_check_open_static(OSObject *provider, kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode);
     int ff_vnode_check_open(kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode);
+    
+    static int ff_kauth_callback_static(OSObject *provider, kauth_cred_t credential, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
+    int ff_kauth_callback(kauth_cred_t credential, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
+
     static int ff_get_agent_pid_static(OSObject *provider);
     int ff_evaluate_vnode_check_open(struct policy_query *);
 
@@ -68,8 +76,8 @@ public:
     kern_return_t addClientPolicy(FlockFlockClientPolicy policy);
 
 private:
-    bool startProcessMonitor();
-    bool stopProcessMonitor();
+    bool startPersistence();
+    bool stopPersistence();
 
     bool initQueryContext(mach_query_context *context);
     void destroyQueryContext(mach_query_context *context);
@@ -94,11 +102,11 @@ private:
     struct mac_policy_ops policyOps;
     struct mac_policy_conf policyConf;
     
-    /* exec MAC policy; we watch processes even when filtering isn't active */
-    mac_policy_handle_t execHandle;
-    struct mac_policy_ops execOps;
-    struct mac_policy_conf execConf;
-    
+    /* persistence MAC policy; prevents tampering with FlockFlock core files */
+    mac_policy_handle_t persistenceHandle;
+    struct mac_policy_ops persistenceOps;
+    struct mac_policy_conf persistenceConf;
+    kauth_listener_t kauthListener = NULL;
 };
 
 #endif

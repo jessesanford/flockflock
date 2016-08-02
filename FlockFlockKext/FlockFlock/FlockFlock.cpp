@@ -24,14 +24,14 @@ extern "C" {
     int _mac_policy_unregister_internal(mac_policy_handle_t handlep);
 }
 
-static int _ff_vnode_check_exec_internal(kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel,struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen)
-{
-    return com_zdziarski_driver_FlockFlock::ff_vnode_check_exec_static(com_zdziarski_driver_FlockFlock_provider, cred, vp, scriptvp, vnodelabel, scriptlabel, execlabel, cnp, csflags, macpolicyattr, macpolicyattrlen);
-}
-
 static int _ff_vnode_check_open_internal(kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode)
 {
     return com_zdziarski_driver_FlockFlock::ff_vnode_check_open_static(com_zdziarski_driver_FlockFlock_provider, cred, vp, label, acc_mode);
+}
+
+static int _ff_kauth_callback_internal(kauth_cred_t cred, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
+{
+    return com_zdziarski_driver_FlockFlock::ff_kauth_callback_static(com_zdziarski_driver_FlockFlock_provider, cred, idata, action, arg0, arg1, arg2, arg3);
 }
 
 /* persistence defense 
@@ -115,21 +115,7 @@ int _ff_vnode_check_setmode_internal(kauth_cred_t cred, struct vnode *vp, struct
     return _ff_eval_vnode(vp);
 }
 
-bool com_zdziarski_driver_FlockFlock::initQueryContext(mach_query_context *context) {
-    context->policy_lock = IOLockAlloc();
-    context->reply_lock  = IOLockAlloc();
-    return true;
-}
-
-void com_zdziarski_driver_FlockFlock::destroyQueryContext(mach_query_context *context) {
-    IOLog("FlockFlock::destroyQueryContext: waiting for lock");
-    IOLockLock(context->policy_lock);
-    IOLockLock(context->reply_lock);
-    
-    IOLog("FlockFlock::destroyQueryContext: destroying locks");
-    IOLockFree(context->policy_lock);
-    IOLockFree(context->reply_lock);
-}
+/* FlockFlock driver begin */
 
 bool com_zdziarski_driver_FlockFlock::init(OSDictionary *dict)
 {
@@ -150,8 +136,9 @@ bool com_zdziarski_driver_FlockFlock::init(OSDictionary *dict)
     lock     = IOLockAlloc();
     
     initQueryContext(&policyContext);
-    
     setProperty("IOUserClientClass", "com_zdziarski_driver_FlockFlockClient");
+    kauthListener = kauth_listen_scope(KAUTH_SCOPE_FILEOP, &_ff_kauth_callback_internal, NULL);
+
     return res;
 }
 
@@ -175,59 +162,59 @@ bool com_zdziarski_driver_FlockFlock::start(IOService *provider)
 
     super::registerService();
     IOLog("FlockFlock::start successful\n");
-    startProcessMonitor();
+    
+    // startPersistence();
 
     return true;
 }
 
-bool com_zdziarski_driver_FlockFlock::startProcessMonitor()
+bool com_zdziarski_driver_FlockFlock::startPersistence()
 {
     bool success = false;
     
-    execHandle = { 0 };
-    execOps = {
-        .mpo_vnode_check_exec           = _ff_vnode_check_exec_internal
-        
-        /* persistence defense; disabled in development */
-//        .mpo_vnode_check_unlink = _ff_vnode_check_unlink_internal,
-//        .mpo_vnode_check_write  = _ff_vnode_check_write_internal,
-//        .mpo_vnode_check_setmode = _ff_vnode_check_setmode_internal,
-//        .mpo_vnode_check_setowner = _ff_vnode_check_setowner_internal,
+    persistenceHandle = { 0 };
+    persistenceOps = {
+        .mpo_vnode_check_unlink = _ff_vnode_check_unlink_internal,
+        .mpo_vnode_check_setmode = _ff_vnode_check_setmode_internal,
+        .mpo_vnode_check_setowner = _ff_vnode_check_setowner_internal,
+        .mpo_vnode_check_rename_from = _ff_vnode_check_rename_from_internal
 //        .mpo_vnode_check_truncate    = _ff_vnode_check_truncate_internal,
-//        .mpo_vnode_check_rename_from = _ff_vnode_check_rename_from_internal
+//        .mpo_vnode_check_write  = _ff_vnode_check_write_internal,
     };
-    execConf = {
-        .mpc_name            = "FF Process Monitor and Defenses",
-        .mpc_fullname        = "FlockFlock Kernel-Mode Process Monitor and Defenses",
+    
+    persistenceConf = {
+        .mpc_name            = "FF Persistence Mode",
+        .mpc_fullname        = "FlockFlock Kernel-Mode Persistence Mode",
         .mpc_labelnames      = NULL,
         .mpc_labelname_count = 0,
-        .mpc_ops             = &execOps,
-        .mpc_loadtime_flags  = MPC_LOADTIME_FLAG_UNLOADOK, /* disable MPC_LOADTIME_FLAG_UNLOADOK to prevent unloading */
+        .mpc_ops             = &persistenceOps,
+        .mpc_loadtime_flags  = MPC_LOADTIME_FLAG_UNLOADOK,
         .mpc_field_off       = NULL,
         .mpc_runtime_flags   = 0,
         .mpc_list            = NULL,
         .mpc_data            = NULL
     };
     
-    int mpr = _mac_policy_register_internal(&execConf, &execHandle);
+    int mpr = _mac_policy_register_internal(&persistenceConf, &persistenceHandle);
     if (!mpr ) {
         success = true;
-        IOLog("FlockFlock::startProcessMonitor: process monitor started successfully\n");
+        IOLog("FlockFlock::startProcessMonitor: persistence started successfully\n");
     } else {
-        IOLog("FlockFlock::startProcessMonitor: an error occured while starting the process monitor: %d\n", mpr);
+        IOLog("FlockFlock::startProcessMonitor: an error occured while starting persistence: %d\n", mpr);
     }
     return success;
 }
 
-bool com_zdziarski_driver_FlockFlock::stopProcessMonitor()
+bool com_zdziarski_driver_FlockFlock::stopPersistence()
 {
+    
     bool success = false;
-    kern_return_t kr = _mac_policy_unregister_internal(execHandle);
+    kern_return_t kr = _mac_policy_unregister_internal(persistenceHandle);
     if (kr == KERN_SUCCESS) {
         success = true;
-        IOLog("FlockFlock::stopFilter: process monitor stopped successfully\n");
+        IOLog("FlockFlock::stopFilter: persistence stopped successfully\n");
     } else {
-        IOLog("FlockFlock::stopFilter: an error occured while stopping the process monitor: %d\n", kr);
+        IOLog("FlockFlock::stopFilter: an error occured while stopping persistence: %d\n", kr);
     }
     return success;
 }
@@ -372,6 +359,22 @@ IOReturn com_zdziarski_driver_FlockFlock::setProperties(OSObject* properties)
     return kIOReturnUnsupported;
 }
 
+bool com_zdziarski_driver_FlockFlock::initQueryContext(mach_query_context *context) {
+    context->policy_lock = IOLockAlloc();
+    context->reply_lock  = IOLockAlloc();
+    return true;
+}
+
+void com_zdziarski_driver_FlockFlock::destroyQueryContext(mach_query_context *context) {
+    IOLog("FlockFlock::destroyQueryContext: waiting for lock");
+    IOLockLock(context->policy_lock);
+    IOLockLock(context->reply_lock);
+    
+    IOLog("FlockFlock::destroyQueryContext: destroying locks");
+    IOLockFree(context->policy_lock);
+    IOLockFree(context->reply_lock);
+}
+
 bool com_zdziarski_driver_FlockFlock::receivePolicyResponse(struct policy_response *response, struct mach_query_context *context)
 {
     bool success = false;
@@ -442,41 +445,33 @@ int com_zdziarski_driver_FlockFlock::sendPolicyQuery(struct policy_query *query,
     return ret;
 }
 
-int com_zdziarski_driver_FlockFlock::ff_get_agent_pid_static(OSObject *provider) {
-    com_zdziarski_driver_FlockFlock *me = (com_zdziarski_driver_FlockFlock *)provider;
-    return me->userAgentPID;
-}
-
-int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec_static(OSObject *provider, kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel,struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen)
+int com_zdziarski_driver_FlockFlock::ff_kauth_callback_static(OSObject *provider, kauth_cred_t cred, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
 {
     com_zdziarski_driver_FlockFlock *me = (com_zdziarski_driver_FlockFlock *)provider;
-    return me->ff_vnode_check_exec(cred, vp, scriptvp, vnodelabel, scriptlabel, execlabel, cnp, csflags, macpolicyattr, macpolicyattrlen);
+    return me->ff_kauth_callback(cred, idata, action, arg0, arg1, arg2, arg3);
 }
 
-int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec(kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel, struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen)
-{
-    char proc_path[MAXPATHLEN];
-    char proc_name[MAXPATHLEN];
-    int proc_len = MAXPATHLEN, name_len = MAXPATHLEN;
-    int pid;
-    int ret;
 
-    IOLockLock(lock);
-    pid = proc_selfpid();
-    proc_name[0] = 0;
-    proc_selfname(proc_name, name_len);
-    proc_name[MAXPATHLEN-1] = 0;
-    IOLog("ff_vnode_check_exec: looking up process path for pid %d (%s)\n", pid, proc_name);
-    ret = vn_getpath(vp, proc_path, &proc_len); /* path to proc binary */
-    if (ret != 0) {
-        IOLog("ff_vnode_check_exec: lookup failed for pid %d, error %d\n", pid, ret);
-        return 0;
-    }
+int com_zdziarski_driver_FlockFlock::ff_kauth_callback(kauth_cred_t credential, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3)
+{
+    char proc_path[MAXPATHLEN] = { 0 };
+    pid_t pid = -1;
+    pid_t ppid = -1;
+    uid_t uid = -1;
+    gid_t gid = -1;
     
-    proc_path[MAXPATHLEN-1] = 0;
-    proc_len = (int)strlen(proc_path);
-    IOLog("ff_vnode_check_exec: process path for pid %d is %s len %d\n", pid, proc_path, proc_len);
+    if(KAUTH_FILEOP_EXEC != action)
+        return KAUTH_RESULT_DEFER;
+    
+    strncpy(proc_path, (const char*)arg1, MAXPATHLEN-1);
+    
+    uid = kauth_getuid();
+    gid = kauth_getgid();
+    pid = proc_selfpid();
+    ppid = proc_selfppid();
 
+    IOLog("ff_kauth_callback: pid %d(%d, %d) parent %d path %s\n", pid, uid, gid, ppid, proc_path);
+    
     /* shorten applications down to their .app package */
     if (!strncmp(proc_path, "/Applications/", 14)) {
         char *dot = strchr(proc_path, '.');
@@ -485,10 +480,15 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec(kauth_cred_t cred, stru
         }
     }
     
-    if (proc_len > 0) {
+    IOLockLock(lock);
+
+    if (proc_path[0]) {
         struct pid_path *p = (struct pid_path *)IOMalloc(sizeof(struct pid_path));
         if (p) {
             p->pid = pid;
+            p->ppid = ppid;
+            p->uid = uid;
+            p->gid = gid;
             p->next = NULL;
             strncpy(p->path, proc_path, PATH_MAX-1);
             if (! pid_root) {
@@ -511,7 +511,15 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec(kauth_cred_t cred, stru
         }
     }
     IOLockUnlock(lock);
-    return 0;
+
+    return KAUTH_RESULT_DEFER;
+}
+
+
+
+int com_zdziarski_driver_FlockFlock::ff_get_agent_pid_static(OSObject *provider) {
+    com_zdziarski_driver_FlockFlock *me = (com_zdziarski_driver_FlockFlock *)provider;
+    return me->userAgentPID;
 }
 
 int com_zdziarski_driver_FlockFlock::ff_vnode_check_open_static(OSObject *provider, kauth_cred_t cred, struct vnode *vp, struct label *label, int acc_mode)
@@ -640,7 +648,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     }
     
     IOLockLock(lock);
-
+    
     /* build the policy query */
 
     query = (struct policy_query *)IOMalloc(sizeof(struct policy_query));
@@ -668,7 +676,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
         strncpy(query->process_name, proc_path, PATH_MAX);
         IOLog("ff_vnode_check_open: process path for pid %d is %s\n", pid, proc_path);
     } else { /* usually happens if the process started before our kernel module loaded, assume safe */
-        IOLog("ff_vnode_check_open: failed to locate process path for pid %d\n", pid);
+        // IOLog("ff_vnode_check_open: failed to locate process path for pid %d\n", pid);
         IOFree(query, sizeof(struct policy_query));
         return 0;
     }
@@ -703,6 +711,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     return ret;
 }
 
+
 void com_zdziarski_driver_FlockFlock::stop(IOService *provider)
 {
     bool active;
@@ -714,7 +723,8 @@ void com_zdziarski_driver_FlockFlock::stop(IOService *provider)
     active = filterActive;
     IOLockUnlock(lock);
     
-    stopProcessMonitor();
+    //stopProcessMonitor();
+    kauth_unlisten_scope(kauthListener);
 
     if (active == true) {
         stopFilter();
