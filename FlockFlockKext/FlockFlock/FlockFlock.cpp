@@ -183,7 +183,8 @@ bool com_zdziarski_driver_FlockFlock::startProcessMonitor()
     
     execHandle = { 0 };
     execOps = {
-        .mpo_vnode_check_exec   = _ff_vnode_check_exec_internal,
+        .mpo_vnode_check_exec           = _ff_vnode_check_exec_internal
+        
 //        .mpo_vnode_check_unlink = _ff_vnode_check_unlink_internal,
 //        .mpo_vnode_check_write  = _ff_vnode_check_write_internal,
 //        .mpo_vnode_check_setmode = _ff_vnode_check_setmode_internal,
