@@ -505,6 +505,7 @@ int com_zdziarski_driver_FlockFlock::ff_evaluate_vnode_check_open(struct policy_
     int proc_len = (int)strlen(query->process_name);
     int path_len = (int)strlen(query->path);
     
+    IOLockLock(lock);
     FlockFlockPolicy rule = policyRoot;
     while(rule) {
         size_t rpath_len = strlen(rule->data.rulePath);
@@ -578,18 +579,20 @@ int com_zdziarski_driver_FlockFlock::ff_evaluate_vnode_check_open(struct policy_
                 break;
                 
         }
+
         rule = rule->next;
     }
+    IOLockUnlock(lock);
     
     if (whitelisted == true)
         return 0;
     if (blacklisted == true) {
-        printf("FlockFlock::ff_vnode_check_open: deny open of %s by pid %d (%s) wht %d blk %d\n", query->path, query->pid, query->process_name, whitelisted, blacklisted);
+        IOLog("FlockFlock::ff_vnode_check_open: deny open of %s by pid %d (%s) wht %d blk %d\n", query->path, query->pid, query->process_name, whitelisted, blacklisted);
         
         return EACCES;
     }
     
-    printf("FlockFlock::ff_vnode_check_open: ask open of %s by pid %d (%s) wht %d blk %d\n", query->path, query->pid, query->process_name, whitelisted, blacklisted);
+    IOLog("FlockFlock::ff_vnode_check_open: ask open of %s by pid %d (%s) wht %d blk %d\n", query->path, query->pid, query->process_name, whitelisted, blacklisted);
 
     return EAUTH;
 }
@@ -609,7 +612,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     if (vnode_isdir(vp))        /* always allow directories, we only work with files */
         return 0;
     if (userAgentPID == pid) {  /* friendlies */
-        printf("allowing user agent pid access to %s\n", target);
+        IOLog("allowing user agent pid access to %s\n", target);
         return 0;
     }
     
@@ -618,11 +621,11 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     query = (struct policy_query *)IOMalloc(sizeof(struct policy_query));
     query->pid = pid;
     query->query_type = FFQ_ACCESS;
-    
+    query->path[0] = 0;
     if (! vn_getpath(vp, query->path, &buflen))
         query->path[PATH_MAX-1] = 0;
     
-    /* pull out the query path from our dictionary */
+    /* pull out the proc path */
     
     IOLockLock(lock);
     
