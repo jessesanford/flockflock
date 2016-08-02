@@ -1,7 +1,17 @@
 FlockFlock - file access policy enforcement
 by Jonathan Zdziarski 
 
-THE PROBLEM
+This project is currently UNDER DEVELOPMENT and ALPHA VERSION.
+
+USE AT YOUR OWN RISK!
+
+NOTE: I have applied for a kext signing certificate from Apple. Without 
+one, FlockFlock only works with SIP turned off on the host machine, 
+therefore FlockFlock should be used only for testing until Apple 
+provides a cert.
+
+WHY WE NEED FLOCKFLOCK
+
 One of the worst parts about being compromised is not knowing you're 
 compromised, and having your data stolen by spyware, or hijacked by
 ransomware, only to find out about it too late. Most security researchers 
@@ -69,29 +79,28 @@ FEATURES
   might attempt to steal or encrypt your personal
 - A user-friendly interface to add new rules and receive notifications of
   unauthorized access attempts.
-- Self-defending; must be uninstalled from recovery mode. Protects
-  against root processes from unloading the kernel extension or
-  deleting or moving any core files.
+- Persistence; protects itself against root processes from unloading
+  the kernel extension or tampering with core files.
+      * This feature has been disabled in alpha versions
 
 INSTALLATION
 
-Until Apple provides me with kext a kext signing certificate, you will
-have to /temporarily/ disable SIP in order to install or uninstall 
-FlockFlock. Once installed, you can immediately turn it back on.
+NOTE: Until Apple provides me with kext a kext signing certificate, you 
+will have to disable SIP in order to use FlockFlock. This compromises
+the security of macOS, so I only recommend using FlockFlock for testing
+until Apple cuts a kext signing cert for me. 
 
-1. Reboot your computer into "Recovery Mode" by rebooting and holding in
-   Command-R after the chime, until it boots to the recovery partition.
-   Start a Terminal (Utilities->Terminal) and type:
+Reboot your computer into "Recovery Mode" by rebooting and holding in
+Command-R after the chime, until it boots to the recovery partition.
+Start a Terminal (Utilities->Terminal) and type:
 
-	csrutil disable; reboot
+    csrutil disable; reboot
 
-2. When your system reboots, double click the FlockFlock.pkg file and 
-   follow the installation process.
+After your system reboots, double click the FlockFlock.pkg file and follow 
+the installation process. A reboot is recommended after installation, but 
+not required.
 
-3. After installation is complete, reboot back into recovery mode to
-   re-enable SIP, by typing: csruril enable; reboot
-
-FIRST USE
+FIRST RUN
 
 When the system comes back up, FlockFlock should be active on your
 system, and you should start being prompted to grant file access
@@ -105,52 +114,36 @@ your choices so it won't bother you again, unless you check the box
 
 RULES EDITING
 
-To help make FlockFlock robust against attacks, rules editing is not
-currently possible except from recovery mode.
+For manual rules editing, edit the .flockflockrc file in your home
+directory. You will need to reboot in order for the changes to take effect,
+since they are programmed directly into the kernel.
 
-1. Boot into recovery mode
-2. Open a terminal
-3. You may either edit or delete the .flockflockrc file in your home
-   directory. If you delete it, it will be replaced with the defaults.c
-4. Reboot back into the OS
+REMOVAL 
 
-REMOVAL / IF SOMETHING GOES WRONG
-
-In the event you don't like FlockFlock, or something has tampered with it, 
-causing issues with your system, you can remove it only one way:
-
-To delete FlockFlock, you'll also need to boot into recovery mode. This
-is because FlockFlock defends itself against deletion or other attempts
-to remove it. Launch a terminal in recovery mode, then run the following
-commands:
-
-NOTE: ALPHA VERSIONS HAVE PERSISTENCE TURNED OFF, SO YOU WONT NEED
-      RECOVERY MODE TO DELETE THE APP
-
-NOTE: "Macintosh HD" may be mounted somewhere else on your system
-
-cd "/Volumes/Machintosh HD"
-rm -rf ./Library/Extensions/FlockFlock.kext
-rm -rf ./Library/Application\ Support/FlockFlock
-rm -f ./Library/LaunchDaemons/com.zdziarski.FlockFlock.plist
-rm -f ./Users/<your username>/Library/LaunchAgents/com.zdziarski.FlockFlockUserAgent.plist
-rm -f ./Users/<your username>/.flockflockrc
+sudo -s
+rm -rf /Library/Extensions/FlockFlock.kext
+rm -rf /Library/Application\ Support/FlockFlock
+rm -f /Library/LaunchDaemons/com.zdziarski.FlockFlock.plist
+rm -f ~/Library/LaunchAgents/com.zdziarski.FlockFlockUserAgent.plist
+rm -f ~/.flockflockrc
 reboot
 
-When the system comes back up, FlockFlock should be gone.
-
-SELF DEFENSE
+PERSISTENCE 
 
 The module prevents deletion of core files. Any attempt to unload the
 kernel extension, except through recovery mode, will cause a kernel
 panic and subsequent reboot. These are designed to protect your data,
 not make things convenient.
 
+NOTE: Persistence is disabled for alpha versions
+
 COMPATIBILITY
 
-- Requires a minimum of OS X El Capitan
+Tested With:
+    El Capitan
+    Sierra Beta 3
 
-  NOTE: THIS SOFTWARE IS ALPHA SOFTWARE AND MAY HAVE SEVERE BUGS
+    NOTE: THIS SOFTWARE IS ALPHA SOFTWARE AND MAY HAVE BUGS
 
 KNOWN BUGS
 
@@ -159,8 +152,6 @@ KNOWN BUGS
 FUTURE PLANS
 - Implement a rules editing tool in user-space and give it exclusive
   editing capabilities (to avoid having to boot into recovery mode)
-- Implement temporary rules that expire when the process exits
-- Implement one-time access (in addition to "Forget on Restart")
 - Implement activity logging
 - Richer popup screen to support more configurations
 
