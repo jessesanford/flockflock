@@ -192,3 +192,4 @@ CHANGELOG
         Re-checked policy list before sending blocked queries
 0.0.3   Added radio buttons for choosing "Once", "Until Restart",
         and "Forever"
+0.0.4   Fixed issues with OSDictionary, replaced with custom structure
