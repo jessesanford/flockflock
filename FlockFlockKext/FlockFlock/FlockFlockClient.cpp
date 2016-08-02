@@ -96,7 +96,7 @@ IOReturn com_zdziarski_driver_FlockFlockClient::externalMethod(uint32_t selector
 
 bool com_zdziarski_driver_FlockFlockClient::initWithTask(task_t owningTask, void *securityToken, UInt32 type, OSDictionary *properties)
 {
-    printf("FlockFlockClient::initWithTask client init\n");
+    IOLog("FlockFlockClient::initWithTask client init\n");
     
     if (!owningTask)
         return false;
@@ -118,7 +118,7 @@ bool com_zdziarski_driver_FlockFlockClient::initWithTask(task_t owningTask, void
 
 bool com_zdziarski_driver_FlockFlockClient::start(IOService *provider)
 {
-    printf("FlockFlockClient::start client start\n");
+    IOLog("FlockFlockClient::start client start\n");
     if (! super::start(provider))
         return false;
     
@@ -130,7 +130,7 @@ bool com_zdziarski_driver_FlockFlockClient::start(IOService *provider)
 
 IOReturn com_zdziarski_driver_FlockFlockClient::clientClose(void)
 {
-    printf("FlockFlockClient::clientClose client close\n");
+    IOLog("FlockFlockClient::clientClose client close\n");
     m_driver->clearMachPort();
     terminate();
     return kIOReturnSuccess;
@@ -138,13 +138,13 @@ IOReturn com_zdziarski_driver_FlockFlockClient::clientClose(void)
 
 IOReturn com_zdziarski_driver_FlockFlockClient::registerNotificationPort(mach_port_t port, UInt32 type, io_user_reference_t refCon)
 {
-    printf("FlockFlockClient::registerNotificationPort reference: %d\n", (int)refCon);
+    IOLog("FlockFlockClient::registerNotificationPort reference: %d\n", (int)refCon);
     bool ret = m_driver->setMachPort(port);
     if (ret == true) {
-        printf("FlockFlockClient::registerNotificationPort successful\n");
+        IOLog("FlockFlockClient::registerNotificationPort successful\n");
         return kIOReturnSuccess;
     }
-    printf("FlockFlockClient::registerNotificationPort failed\n");
+    IOLog("FlockFlockClient::registerNotificationPort failed\n");
 
     return kIOReturnInvalid;
 }

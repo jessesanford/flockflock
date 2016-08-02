@@ -456,15 +456,20 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec_static(OSObject *provid
 int com_zdziarski_driver_FlockFlock::ff_vnode_check_exec(kauth_cred_t cred, struct vnode *vp, struct vnode *scriptvp, struct label *vnodelabel, struct label *scriptlabel, struct label *execlabel, struct componentname *cnp, u_int *csflags, void *macpolicyattr, size_t macpolicyattrlen)
 {
     char proc_path[MAXPATHLEN];
-    int proc_len = MAXPATHLEN;
-    int pid = proc_selfpid();
+    char proc_name[MAXPATHLEN];
+    int proc_len = MAXPATHLEN, name_len = MAXPATHLEN;
+    int pid;
     int ret;
 
     IOLockLock(lock);
-    printf("ff_vnode_check_exec: looking up process path for pid %d\n", pid);
+    pid = proc_selfpid();
+    proc_name[0] = 0;
+    proc_selfname(proc_name, name_len);
+    proc_name[MAXPATHLEN-1] = 0;
+    IOLog("ff_vnode_check_exec: looking up process path for pid %d (%s)\n", pid, proc_name);
     ret = vn_getpath(vp, proc_path, &proc_len); /* path to proc binary */
     if (ret != 0) {
-        printf("ff_vnode_check_exec: lookup failed for pid %d, error %d\n", pid, ret);
+        IOLog("ff_vnode_check_exec: lookup failed for pid %d, error %d\n", pid, ret);
         return 0;
     }
     

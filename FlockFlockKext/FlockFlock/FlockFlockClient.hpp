@@ -31,8 +31,6 @@ public:
     virtual void stop(IOService *provider) override;
     virtual void free(void) override;
     virtual IOReturn registerNotificationPort(mach_port_t port, UInt32 type, io_user_reference_t refCon) override;
-
-    
     IOReturn externalMethod(uint32_t selector, IOExternalMethodArguments *args, IOExternalMethodDispatch *dispatch,
                             OSObject *target, void *reference) override;
     
