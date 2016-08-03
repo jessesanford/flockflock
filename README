@@ -205,3 +205,4 @@ CHANGELOG
 0.0.6	Added MAC hooking to detect and associate posix spawned procs
         Cleanup temporary tables in memory
         Added "Until Quit" option, made the default
+        Added application icon to user prompt
