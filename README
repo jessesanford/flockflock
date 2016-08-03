@@ -149,7 +149,7 @@ Tested With:
 
 KNOWN BUGS
 
-- None (this list is expected to grow)
+- Not currently stable on Sierra
 
 FUTURE PLANS
 - Implement a rules editing tool in user-space and give it exclusive
