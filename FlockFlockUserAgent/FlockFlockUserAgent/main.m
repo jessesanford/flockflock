@@ -8,6 +8,8 @@
 
 
 #include <CoreFoundation/CoreFoundation.h>
+#include <Foundation/Foundation.h>
+#include <AppKit/AppKit.h>
 #include <IOKit/IOKitLib.h>
 #include <mach/mach.h>
 #include <mach/mach_error.h>
@@ -31,8 +33,8 @@ pthread_mutex_t lock, prompt_lock;
 
 #include "../../FlockFlockKext/FlockFlock/FlockFlockClientShared.h"
 
-enum FlockFlockPolicyClass get_class_by_name(const char *name) {
 
+enum FlockFlockPolicyClass get_class_by_name(const char *name) {
     if (!strcmp(name, "allow"))
         return kFlockFlockPolicyClassWhitelistAllMatching;
     if (!strcmp(name, "deny"))
@@ -235,8 +237,9 @@ int prompt_user_response(struct policy_query *query)
     CFStringRef selectedElement;
     SInt32 err, response;
     char *path, *extension, *ptr, option[PATH_MAX];
+    char *displayName;
     int i;
-
+    
     strncpy(proc_path, query->process_name, PATH_MAX-1);
     proc_pidpath(ppid, pproc_path, PATH_MAX);
     
@@ -246,6 +249,16 @@ int prompt_user_response(struct policy_query *query)
     alert_str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, strdup(alert_message), kCFStringEncodingMacRoman, kCFAllocatorDefault);
    
     CFStringRef base = CFSTR("file:///Library/Application%20Support/FlockFlock/lock.png");
+    displayName = strdup(query->process_name);
+    if (displayName[strlen(displayName)-1] == '/')
+        displayName[strlen(displayName)-1] = 0;
+    NSImage *image = [[NSWorkspace sharedWorkspace] iconForFile: [ NSString stringWithUTF8String: displayName ] ];
+    if (image != nil) { /* write to temp file, since we don't know where it came from */
+        NSBitmapImageRep *imgRep = [ [ image representations ] objectAtIndex: 0 ];
+        NSData *data = [ imgRep representationUsingType: NSPNGFileType properties: nil ];
+        [ data writeToFile: @"/tmp/flockflock_temp.png" atomically: NO ];
+        base = CFSTR("/tmp/flockflock_temp.png");
+    }
     CFURLRef icon = CFURLCreateWithString(NULL, base, NULL);
     
     /* construct path dropdown */
@@ -361,7 +374,7 @@ int prompt_user_response(struct policy_query *query)
             rule.rulePath[0] = 0; /* any */
     }
 
-    strncpy(rule.processName, proc_path, sizeof(rule.processName)-1);
+    strncpy(rule.processName, displayName, sizeof(rule.processName)-1);
     if (responseFlags & CFUserNotificationCheckBoxChecked(1)) {
         rule.temporaryRule = true;
         rule.temporaryPid = query->pid;

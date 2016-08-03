@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		700BE6E51D4BDEC0004F20D3 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 700BE6E41D4BDEC0004F20D3 /* main.c */; };
+		700BE6E51D4BDEC0004F20D3 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 700BE6E41D4BDEC0004F20D3 /* main.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,7 +24,7 @@
 
 /* Begin PBXFileReference section */
 		700BE6E11D4BDEC0004F20D3 /* FlockFlockUserAgent */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = FlockFlockUserAgent; sourceTree = BUILT_PRODUCTS_DIR; };
-		700BE6E41D4BDEC0004F20D3 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		700BE6E41D4BDEC0004F20D3 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		700BE6ED1D4BDF70004F20D3 /* FlockFlockClientShared.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = FlockFlockClientShared.h; path = ../../FlockFlockKext/FlockFlock/FlockFlockClientShared.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -59,7 +59,7 @@
 			isa = PBXGroup;
 			children = (
 				700BE6ED1D4BDF70004F20D3 /* FlockFlockClientShared.h */,
-				700BE6E41D4BDEC0004F20D3 /* main.c */,
+				700BE6E41D4BDEC0004F20D3 /* main.m */,
 			);
 			path = FlockFlockUserAgent;
 			sourceTree = "<group>";
@@ -120,7 +120,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				700BE6E51D4BDEC0004F20D3 /* main.c in Sources */,
+				700BE6E51D4BDEC0004F20D3 /* main.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
