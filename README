@@ -17,7 +17,7 @@ compromised, and having your data stolen by spyware, or hijacked by
 ransomware, only to find out about it too late. Most security researchers 
 aren't even 100% positive that their system hasn't been compromised. 
 Between spyware, ransomware, government hacking, and other threats, simply
-relying on file permissions and a secure execution environment on longer
+relying on file permissions and a secure execution environment no longer
 cuts it. There's a much needed solution for a tool that can keep your
 personal data protected from potentially malicious software that has
 rotted your system.
@@ -85,7 +85,7 @@ FEATURES
 
 INSTALLATION
 
-NOTE: Until Apple provides me with kext a kext signing certificate, you 
+NOTE: Until Apple provides me with a kext signing certificate, you 
 will have to disable SIP's kext checks in order to use FlockFlock, but
 can leave the rest of SIP on. This slightly compromises the security of 
 macOS, so I only recommend using FlockFlock for testing until Apple cuts a 
@@ -149,7 +149,7 @@ Tested With:
 
 KNOWN BUGS
 
-- Not currently stable on Sierra
+- None (this list is expected to grow)
 
 FUTURE PLANS
 - Implement a rules editing tool in user-space and give it exclusive
