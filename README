@@ -202,3 +202,6 @@ CHANGELOG
         Added keychain files to default ruleset, as many apps use it
         Other various improvements
         Hopefully added (some) stability for Sierra
+0.0.6	Added MAC hooking to detect and associate posix spawned procs
+        Cleanup temporary tables in memory
+        Added "Until Quit" option

@@ -16,6 +16,7 @@
 #include <sys/vnode.h>
 #include <sys/kern_event.h>
 #include <sys/kauth.h>
+#include <sys/types.h>
 #include <sys/kern_event.h>
 #include <libkern/libkern.h>
 #include <mach/mach_types.h>
@@ -39,9 +40,18 @@ struct pid_path
     gid_t gid;
     pid_t pid;
     pid_t ppid;
+    uint64_t tid;
     
     char path[PATH_MAX];
     struct pid_path *next;
+};
+
+struct posix_spawn_map
+{
+    pid_t pid;
+    pid_t ppid;
+    uint64_t tid;
+    struct posix_spawn_map *next;
 };
 
 class com_zdziarski_driver_FlockFlock : public IOService
@@ -64,6 +74,9 @@ public:
     static int ff_kauth_callback_static(OSObject *provider, kauth_cred_t credential, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
     int ff_kauth_callback(kauth_cred_t credential, void* idata, kauth_action_t action, uintptr_t arg0, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
 
+    static void ff_cred_label_associate_fork_static(OSObject *provider, kauth_cred_t cred, proc_t proc);
+    void ff_cred_label_associate_fork(kauth_cred_t cred, proc_t proc);
+    
     static int ff_get_agent_pid_static(OSObject *provider);
     int ff_evaluate_vnode_check_open(struct policy_query *);
 
@@ -84,6 +97,10 @@ private:
 
     int sendPolicyQuery(struct policy_query *query, struct mach_query_context *context, bool lock);
     bool receivePolicyResponse(struct policy_response *response, struct mach_query_context *context);
+    void houseKeeping(void);
+    void houseKeepPosixSpawnMap();
+    void houseKeepPathTable();
+    void houseKeepMasterRuleTable();
 
 public:
     mach_port_t notificationPort;
@@ -96,6 +113,7 @@ private:
     FlockFlockPolicyHierarchy policyRoot;
     FlockFlockPolicy lastPolicyAdded;
     struct pid_path *pid_root;
+    struct posix_spawn_map *pid_map, *map_last_insert;
     
     /* file access MAC policy */
     mac_policy_handle_t policyHandle;

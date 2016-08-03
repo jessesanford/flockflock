@@ -236,7 +236,6 @@ int prompt_user_response(struct policy_query *query)
     SInt32 err, response;
     char *path, *extension, *ptr, option[PATH_MAX];
     int i;
-    
 
     strncpy(proc_path, query->process_name, PATH_MAX-1);
     proc_pidpath(ppid, pproc_path, PATH_MAX);
@@ -292,6 +291,7 @@ int prompt_user_response(struct policy_query *query)
     /* construct the popup */
     radio_options = CFArrayCreateMutable(NULL, 0, NULL);
     CFArrayAppendValue(radio_options, CFSTR("Once"));
+    CFArrayAppendValue(radio_options, CFSTR("Until Quit"));
     CFArrayAppendValue(radio_options, CFSTR("Until Restart"));
     CFArrayAppendValue(radio_options, CFSTR("Forever"));
     
@@ -317,7 +317,7 @@ int prompt_user_response(struct policy_query *query)
     
     /* display the popup to the user and get a response */
     parameters = CFDictionaryCreate(0, keys, values, sizeof(keys)/sizeof(*keys), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    notification = CFUserNotificationCreate(kCFAllocatorDefault, 60, kCFUserNotificationPlainAlertLevel | CFUserNotificationPopUpSelection((extension == NULL) ? 0 : 1) | kCFUserNotificationUseRadioButtonsFlag | CFUserNotificationCheckBoxChecked(2), &err, parameters);
+    notification = CFUserNotificationCreate(kCFAllocatorDefault, 60, kCFUserNotificationPlainAlertLevel | CFUserNotificationPopUpSelection((extension == NULL) ? 0 : 1) | kCFUserNotificationUseRadioButtonsFlag | CFUserNotificationCheckBoxChecked(1), &err, parameters);
     response = CFUserNotificationReceiveResponse(notification, 60, &responseFlags);
     
     if (response != 0) {
@@ -362,8 +362,13 @@ int prompt_user_response(struct policy_query *query)
     }
 
     strncpy(rule.processName, proc_path, sizeof(rule.processName)-1);
-    rule.temporaryPid = 0;      /* not implemented */
-    rule.temporaryRule = false; /* not implemented */
+    if (responseFlags & CFUserNotificationCheckBoxChecked(1)) {
+        rule.temporaryRule = true;
+        rule.temporaryPid = query->pid;
+    } else {
+        rule.temporaryRule = false;
+        rule.temporaryPid = 0;
+    }
     
     CFRelease(parameters);
     CFRelease(popup_options);
@@ -371,7 +376,9 @@ int prompt_user_response(struct policy_query *query)
     CFRelease(alert_str);
     
     /* add new rule to driver */
-    if (responseFlags & CFUserNotificationCheckBoxChecked(1) || responseFlags & CFUserNotificationCheckBoxChecked(2))
+    if (responseFlags & CFUserNotificationCheckBoxChecked(1)
+        || responseFlags & CFUserNotificationCheckBoxChecked(2)
+        || responseFlags & CFUserNotificationCheckBoxChecked(3))
     {
         int kr = IOConnectCallMethod(driverConnection, kFlockFlockRequestAddClientRule, NULL, 0, &rule, sizeof(rule), NULL, NULL, NULL, NULL);
         if (kr == 0) {
@@ -380,7 +387,7 @@ int prompt_user_response(struct policy_query *query)
             printf("error occured while adding new rule: %d\n", kr);
         }
         
-        if (responseFlags & CFUserNotificationCheckBoxChecked(2)) {
+        if (responseFlags & CFUserNotificationCheckBoxChecked(3)) {
             printf("writing new rule to .flockflockrc\n");
             write_new_rule(&rule);
         }
