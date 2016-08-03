@@ -319,7 +319,7 @@ int prompt_user_response(struct policy_query *query)
     };
     
     const void* values[] = {
-        CFStringCreateWithCString(NULL, proc_path, kCFStringEncodingUTF8),
+        CFStringCreateWithCString(NULL, displayName, kCFStringEncodingUTF8),
         alert_str,
         CFSTR("Allow"),
         CFSTR("Deny"),
@@ -374,7 +374,7 @@ int prompt_user_response(struct policy_query *query)
             rule.rulePath[0] = 0; /* any */
     }
 
-    strncpy(rule.processName, displayName, sizeof(rule.processName)-1);
+    strncpy(rule.processName, proc_path, sizeof(rule.processName)-1);
     if (responseFlags & CFUserNotificationCheckBoxChecked(1)) {
         rule.temporaryRule = true;
         rule.temporaryPid = query->pid;
