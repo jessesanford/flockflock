@@ -880,7 +880,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
         proc_selfname(process_name, PATH_MAX);
         process_name[PATH_MAX-1] = 0;
         snprintf(app_name, sizeof(app_name), "%s.app/", process_name);
-        if (strcmp(q+1, process_name) && strcmp(q+1, app_name)) {
+        if (strncmp(q+1, process_name, strlen(process_name)) && strncmp(q+1, app_name, strlen(process_name))) {
             char via[128];
             //IOLog("process %s is via %s(%s)\n", proc_path, process_name, app_name);
             snprintf(via, sizeof(via), " via %s", process_name);
