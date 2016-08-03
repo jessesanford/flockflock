@@ -554,8 +554,7 @@ int com_zdziarski_driver_FlockFlock::ff_kauth_callback(kauth_cred_t credential, 
             } else {
                 struct pid_path *ptr = NULL, *next = pid_root;
                 while(next) {
-                    if (next->pid == pid && next->tid == tid) { /* reuse old slots */
-                        strncpy(next->path, proc_path, PATH_MAX-1);
+                    if (next->pid == pid) { /* we must be a thread, defer to main thread's path */
                         IOFree(p, sizeof(struct pid_path));
                         IOLockUnlock(lock);
                         return 0;
@@ -857,7 +856,7 @@ int com_zdziarski_driver_FlockFlock::ff_vnode_check_open(kauth_cred_t cred, stru
     ptr = pid_root;
     proc_path[0] = 0;
     while(ptr) {
-        if (ptr->pid == pid && ptr->tid == tid) {
+        if (ptr->pid == pid) { // && ptr->tid == tid) {
             strncpy(proc_path, ptr->path, PATH_MAX-1);
             break;
         }

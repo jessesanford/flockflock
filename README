@@ -204,4 +204,4 @@ CHANGELOG
         Hopefully added (some) stability for Sierra
 0.0.6	Added MAC hooking to detect and associate posix spawned procs
         Cleanup temporary tables in memory
-        Added "Until Quit" option
+        Added "Until Quit" option, made the default
